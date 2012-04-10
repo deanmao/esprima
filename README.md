@@ -1,54 +1,5 @@
 This forked version of Esprima targets the Lua programming language.
 
-
-Esprima ([esprima.org](http://esprima.org)) is an educational
-[ECMAScript](http://www.ecma-international.org/publications/standards/Ecma-262.htm)
-(also popularly known as [JavaScript](http://en.wikipedia.org/wiki/JavaScript>JavaScript))
-parsing infrastructure for multipurpose analysis. It is also written in ECMAScript.
-
-Esprima serves as a good basis for various tools such as source
-modification ([Esmorph](https://github.com/ariya/esmorph)), coverage analyzer
-([node-cover](https://github.com/itay/node-cover) and
-[coveraje](https://github.com/coveraje/coveraje)),
-source-to-source compiler ([Marv](https://github.com/Yoric/Marv-the-Tinker)),
-syntax formatter ([Code Painter](https://github.com/fawek/codepainter)),
-and code generator ([escodegen](https://github.com/Constellation/escodegen)).
-
-Esprima can be used in a web browser:
-
-    <script src="esprima.js"></script>
-
-or in a Node.js application via the package manager:
-
-    npm install esprima
-
-Esprima parser output is compatible with Mozilla (SpiderMonkey)
-[Parser API](https://developer.mozilla.org/en/SpiderMonkey/Parser_API).
-
-A very simple example:
-
-    esprima.parse('var answer=42').body[0].declarations[0].init
-
-produces the following object:
-
-    { type: 'Literal', value: 42 }
-
-Esprima is still in the development, for now please check
-[the wiki documentation](http://wiki.esprima.org).
-
-Since it is not comprehensive nor complete, refer to the
-[issue tracker](http://issues.esprima.org) for
-[known problems](http://code.google.com/p/esprima/issues/list?q=Defect)
-and [future plans](http://code.google.com/p/esprima/issues/list?q=Enhancement).
-Esprima is supported on [many browsers](http://code.google.com/p/esprima/wiki/BrowserCompatibility):
-IE 6+, Firefox 1+, Safari 3+, Chrome 1+, and Opera 8+.
-
-Feedback and contribution are welcomed! Please join the
-[mailing list](http://groups.google.com/group/esprima) and read the
-[contribution guide](http://code.google.com/p/esprima/wiki/ContributionGuide)
-for further info.
-
-
 ### License
 
 Copyright (C) 2012, 2011 [Ariya Hidayat](http://ariya.ofilabs.com/about)
