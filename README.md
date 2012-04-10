@@ -1,3 +1,6 @@
+This forked version of Esprima targets the Lua programming language.
+
+
 Esprima ([esprima.org](http://esprima.org)) is an educational
 [ECMAScript](http://www.ecma-international.org/publications/standards/Ecma-262.htm)
 (also popularly known as [JavaScript](http://en.wikipedia.org/wiki/JavaScript>JavaScript))

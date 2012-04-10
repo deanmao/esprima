@@ -78,6 +78,7 @@ parseStatement: true, parseSourceElement: true */
     TokenName[Token.StringLiteral] = 'String';
 
     Syntax = {
+        TableAssignmentExpression: 'TableAssignmentExpression',
         AssignmentExpression: 'AssignmentExpression',
         ArrayExpression: 'ArrayExpression',
         BlockStatement: 'BlockStatement',
@@ -279,48 +280,26 @@ parseStatement: true, parseSourceElement: true */
         var keyword = false;
         switch (id.length) {
         case 2:
-            keyword = (id === 'if') || (id === 'in') || (id === 'do');
+            keyword = (id === 'if') || (id === 'in') || (id === 'do') || (id === 'or');
             break;
         case 3:
-            keyword = (id === 'var') || (id === 'for') || (id === 'new') || (id === 'try');
+            keyword = (id === 'for') || (id === 'end') || (id === 'not') || (id === 'and');
             break;
         case 4:
-            keyword = (id === 'this') || (id === 'else') || (id === 'case') || (id === 'void') || (id === 'with');
+            keyword = (id === 'then') || (id === 'else');
             break;
         case 5:
-            keyword = (id === 'while') || (id === 'break') || (id === 'catch') || (id === 'throw');
+            keyword = (id === 'while') || (id === 'break') || (id === 'until') || (id === 'local');
             break;
         case 6:
-            keyword = (id === 'return') || (id === 'typeof') || (id === 'delete') || (id === 'switch');
-            break;
-        case 7:
-            keyword = (id === 'default') || (id === 'finally');
+            keyword = (id === 'return') || (id === 'elseif') || (id === 'repeat');
             break;
         case 8:
-            keyword = (id === 'function') || (id === 'continue') || (id === 'debugger');
-            break;
-        case 10:
-            keyword = (id === 'instanceof');
+            keyword = (id === 'function');
             break;
         }
 
         if (keyword) {
-            return true;
-        }
-
-        switch (id) {
-        // Future reserved words.
-        // 'const' is specialized as Keyword in V8.
-        case 'const':
-            return true;
-
-        // For compatiblity to SpiderMonkey and ES.next
-        case 'yield':
-        case 'let':
-            return true;
-        }
-
-        if (strict && isStrictModeReservedWord(id)) {
             return true;
         }
 
@@ -370,24 +349,27 @@ parseStatement: true, parseSourceElement: true */
                     if (index >= length) {
                         throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
                     }
-                    if (ch === '*') {
+                    if (ch === ']') {
                         ch = source[index];
-                        if (ch === '/') {
+                        if (ch === ']') {
                             ++index;
                             blockComment = false;
                         }
                     }
                 }
-            } else if (ch === '/') {
+            } else if (ch === '-') {
                 ch = source[index + 1];
-                if (ch === '/') {
+                if (ch === '-') {
                     index += 2;
                     lineComment = true;
-                } else if (ch === '*') {
-                    index += 2;
-                    blockComment = true;
-                    if (index >= length) {
-                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                    var ch1 = source[index + 2];
+                    var ch2 = source[index + 3];
+                    if (ch1 === '[' && ch2 === '[') {
+                        index += 2;
+                        blockComment = true;
+                        if (index >= length) {
+                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                        }
                     }
                 } else {
                     break;
@@ -503,7 +485,7 @@ parseStatement: true, parseSourceElement: true */
 
         // 7.8.1 Null Literals
 
-        if (id === 'null') {
+        if (id === 'nil') {
             return {
                 type: Token.NullLiteral,
                 value: id,
@@ -567,10 +549,25 @@ parseStatement: true, parseSourceElement: true */
             };
         }
 
+        ch2 = source[index + 1];
+        ch3 = source[index + 2];
+
+        // 3-character punctuators: ...
+
+        if (ch1 === '.' && ch2 === '.' && ch3 === '.') {
+            index += 3;
+            return {
+                type: Token.Punctuator,
+                value: '...',
+                lineNumber: lineNumber,
+                lineStart: lineStart,
+                range: [start, index]
+            };
+        }
+
         // Dot (.) can also start a floating-point number, hence the need
         // to check the next character.
 
-        ch2 = source[index + 1];
         if (ch1 === '.' && !isDecimalDigit(ch2)) {
             return {
                 type: Token.Punctuator,
@@ -583,7 +580,6 @@ parseStatement: true, parseSourceElement: true */
 
         // Peek more characters.
 
-        ch3 = source[index + 2];
         ch4 = source[index + 3];
 
         // 4-character punctuator: >>>=
@@ -601,68 +597,10 @@ parseStatement: true, parseSourceElement: true */
             }
         }
 
-        // 3-character punctuators: === !== >>> <<= >>=
 
-        if (ch1 === '=' && ch2 === '=' && ch3 === '=') {
-            index += 3;
-            return {
-                type: Token.Punctuator,
-                value: '===',
-                lineNumber: lineNumber,
-                lineStart: lineStart,
-                range: [start, index]
-            };
-        }
-
-        if (ch1 === '!' && ch2 === '=' && ch3 === '=') {
-            index += 3;
-            return {
-                type: Token.Punctuator,
-                value: '!==',
-                lineNumber: lineNumber,
-                lineStart: lineStart,
-                range: [start, index]
-            };
-        }
-
-        if (ch1 === '>' && ch2 === '>' && ch3 === '>') {
-            index += 3;
-            return {
-                type: Token.Punctuator,
-                value: '>>>',
-                lineNumber: lineNumber,
-                lineStart: lineStart,
-                range: [start, index]
-            };
-        }
-
-        if (ch1 === '<' && ch2 === '<' && ch3 === '=') {
-            index += 3;
-            return {
-                type: Token.Punctuator,
-                value: '<<=',
-                lineNumber: lineNumber,
-                lineStart: lineStart,
-                range: [start, index]
-            };
-        }
-
-        if (ch1 === '>' && ch2 === '>' && ch3 === '=') {
-            index += 3;
-            return {
-                type: Token.Punctuator,
-                value: '>>=',
-                lineNumber: lineNumber,
-                lineStart: lineStart,
-                range: [start, index]
-            };
-        }
-
-        // 2-character punctuators: <= >= == != ++ -- << >> && ||
-        // += -= *= %= &= |= ^= /=
-
+        // 2-character punctuators: ==, ~=, <=, >=
         if (ch2 === '=') {
-            if ('<>=!+-*%&|^/'.indexOf(ch1) >= 0) {
+            if ('<>~='.indexOf(ch1) >= 0) {
                 index += 2;
                 return {
                     type: Token.Punctuator,
@@ -674,22 +612,21 @@ parseStatement: true, parseSourceElement: true */
             }
         }
 
-        if (ch1 === ch2 && ('+-<>&|'.indexOf(ch1) >= 0)) {
-            if ('+-<>&|'.indexOf(ch2) >= 0) {
-                index += 2;
-                return {
-                    type: Token.Punctuator,
-                    value: ch1 + ch2,
-                    lineNumber: lineNumber,
-                    lineStart: lineStart,
-                    range: [start, index]
-                };
-            }
+        // support the string concatenator '..'
+        if (ch1 === '.' && ch2 === '.') {
+            index += 2;
+            return {
+                type: Token.Punctuator,
+                value: ch1 + ch2,
+                lineNumber: lineNumber,
+                lineStart: lineStart,
+                range: [start, index]
+            };
         }
 
         // The remaining 1-character punctuators.
 
-        if ('[]<>+-*%&|^!~?:=/'.indexOf(ch1) >= 0) {
+        if ('[]#<>+-*%^~=/'.indexOf(ch1) >= 0) {
             return {
                 type: Token.Punctuator,
                 value: nextChar(),
@@ -1293,6 +1230,7 @@ parseStatement: true, parseSourceElement: true */
 
     function isLeftHandSide(expr) {
         switch (expr.type) {
+        case 'TableAssignmentExpression':
         case 'AssignmentExpression':
         case 'BinaryExpression':
         case 'ConditionalExpression':
@@ -1311,172 +1249,26 @@ parseStatement: true, parseSourceElement: true */
         var elements = [],
             undef;
 
-        expect('[');
+        expect('{');
 
-        while (!match(']')) {
+        while (!match('}')) {
             if (match(',')) {
                 lex();
                 elements.push(undef);
             } else {
-                elements.push(parseAssignmentExpression());
+                elements.push(parseTableAssignmentExpression());
 
-                if (!match(']')) {
+                if (!match('}')) {
                     expect(',');
                 }
-            }
-        }
-
-        expect(']');
-
-        return {
-            type: Syntax.ArrayExpression,
-            elements: elements
-        };
-    }
-
-    // 11.1.5 Object Initialiser
-
-    function parsePropertyFunction(param, first) {
-        var previousStrict, body;
-
-        previousStrict = strict;
-        body = parseFunctionSourceElements();
-        if (first && strict && isRestrictedWord(param[0].name)) {
-            throwError(first, Messages.StrictParamName);
-        }
-        strict = previousStrict;
-
-        return {
-            type: Syntax.FunctionExpression,
-            id: null,
-            params: param,
-            body: body
-        };
-    }
-
-    function parseObjectPropertyKey() {
-        var token = lex();
-
-        // Note: This function is called only from parseObjectProperty(), where
-        // EOF and Punctuator tokens are already filtered out.
-
-        if (token.type === Token.StringLiteral || token.type === Token.NumericLiteral) {
-            if (strict && token.octal) {
-                throwError(token, Messages.StrictOctalLiteral);
-            }
-            return createLiteral(token);
-        }
-
-        return {
-            type: Syntax.Identifier,
-            name: token.value
-        };
-    }
-
-    function parseObjectProperty() {
-        var token, key, id, param;
-
-        token = lookahead();
-
-        if (token.type === Token.Identifier) {
-
-            id = parseObjectPropertyKey();
-
-            // Property Assignment: Getter and Setter.
-
-            if (token.value === 'get' && !match(':')) {
-                key = parseObjectPropertyKey();
-                expect('(');
-                expect(')');
-                return {
-                    type: Syntax.Property,
-                    key: key,
-                    value: parsePropertyFunction([]),
-                    kind: 'get'
-                };
-            } else if (token.value === 'set' && !match(':')) {
-                key = parseObjectPropertyKey();
-                expect('(');
-                token = lookahead();
-                if (token.type !== Token.Identifier) {
-                    throwUnexpected(lex());
-                }
-                param = [ parseVariableIdentifier() ];
-                expect(')');
-                return {
-                    type: Syntax.Property,
-                    key: key,
-                    value: parsePropertyFunction(param, token),
-                    kind: 'set'
-                };
-            } else {
-                expect(':');
-                return {
-                    type: Syntax.Property,
-                    key: id,
-                    value: parseAssignmentExpression(),
-                    kind: 'init'
-                };
-            }
-        } else if (token.type === Token.EOF || token.type === Token.Punctuator) {
-            throwUnexpected(token);
-        } else {
-            key = parseObjectPropertyKey();
-            expect(':');
-            return {
-                type: Syntax.Property,
-                key: key,
-                value: parseAssignmentExpression(),
-                kind: 'init'
-            };
-        }
-    }
-
-    function parseObjectInitialiser() {
-        var token, properties = [], property, name, kind, map = {}, toString = String;
-
-        expect('{');
-
-        while (!match('}')) {
-            property = parseObjectProperty();
-
-            if (property.key.type === Syntax.Identifier) {
-                name = property.key.name;
-            } else {
-                name = toString(property.key.value);
-            }
-            kind = (property.kind === 'init') ? PropertyKind.Data : (property.kind === 'get') ? PropertyKind.Get : PropertyKind.Set;
-            if (Object.prototype.hasOwnProperty.call(map, name)) {
-                if (map[name] === PropertyKind.Data) {
-                    if (strict && kind === PropertyKind.Data) {
-                        throwError({}, Messages.StrictDuplicateProperty);
-                    } else if (kind !== PropertyKind.Data) {
-                        throwError({}, Messages.AccessorDataProperty);
-                    }
-                } else {
-                    if (kind === PropertyKind.Data) {
-                        throwError({}, Messages.AccessorDataProperty);
-                    } else if (map[name] & kind) {
-                        throwError({}, Messages.AccessorGetSet);
-                    }
-                }
-                map[name] |= kind;
-            } else {
-                map[name] = kind;
-            }
-
-            properties.push(property);
-
-            if (!match('}')) {
-                expect(',');
             }
         }
 
         expect('}');
 
         return {
-            type: Syntax.ObjectExpression,
-            properties: properties
+            type: Syntax.ArrayExpression,
+            elements: elements
         };
     }
 
@@ -1526,12 +1318,8 @@ parseStatement: true, parseSourceElement: true */
             return createLiteral(token);
         }
 
-        if (match('[')) {
-            return parseArrayInitialiser();
-        }
-
         if (match('{')) {
-            return parseObjectInitialiser();
+            return parseArrayInitialiser();
         }
 
         if (match('(')) {
@@ -1638,6 +1426,17 @@ parseStatement: true, parseSourceElement: true */
 
         useNew = matchKeyword('new');
         expr = useNew ? parseNewExpression() : parsePrimaryExpression();
+
+        // in lua, you can do: call "string"
+        var ahead = lookahead();
+        if (ahead.type === Token.StringLiteral) {
+            var token = lex();
+            expr = {
+                type: Syntax.CallExpression,
+                callee: expr,
+                'arguments': token
+            };
+        }
 
         while (index < length) {
             if (match('.')) {
@@ -1956,6 +1755,35 @@ parseStatement: true, parseSourceElement: true */
         return expr;
     }
 
+    // 11.13.1 Table Property Assignment Operators
+
+    function parseTableAssignmentExpression() {
+        var expr;
+
+        expr = parseConditionalExpression();
+
+        if (matchAssign()) {
+            // LeftHandSideExpression
+            if (state.lastParenthesized !== expr && !isLeftHandSide(expr)) {
+                throwError({}, Messages.InvalidLHSInAssignment);
+            }
+
+            // 11.13.1
+            if (strict && expr.type === Syntax.Identifier && isRestrictedWord(expr.name)) {
+                throwError({}, Messages.StrictLHSAssignment);
+            }
+
+            expr = {
+                type: Syntax.TableAssignmentExpression,
+                operator: lex().value,
+                left: expr,
+                right: parseTableAssignmentExpression()
+            };
+        }
+
+        return expr;
+    }
+
     // 11.13 Assignment Operators
 
     function parseAssignmentExpression() {
@@ -2048,7 +1876,7 @@ parseStatement: true, parseSourceElement: true */
     function parseVariableIdentifier() {
         var token = lex();
 
-        if (token.type !== Token.Identifier) {
+        if (token.type !== Token.Identifier && (token.type !== Token.Punctuator && token.value !== '...')) {
             throwUnexpected(token);
         }
 
@@ -2059,27 +1887,37 @@ parseStatement: true, parseSourceElement: true */
     }
 
     function parseVariableDeclaration(kind) {
-        var id = parseVariableIdentifier(),
-            init = null;
+        var ahead = lookahead();
+        if (ahead.type === Token.Identifier) {
+            var id = parseVariableIdentifier(),
+                init = null;
 
-        // 12.2.1
-        if (strict && isRestrictedWord(id.name)) {
-            throwError({}, Messages.StrictVarName);
-        }
+            // 12.2.1
+            if (strict && isRestrictedWord(id.name)) {
+                throwError({}, Messages.StrictVarName);
+            }
 
-        if (kind === 'const') {
-            expect('=');
-            init = parseAssignmentExpression();
-        } else if (match('=')) {
-            lex();
-            init = parseAssignmentExpression();
-        }
+            if (kind === 'const') {
+                expect('=');
+                init = parseAssignmentExpression();
+            } else if (match('=')) {
+                lex();
+                init = parseAssignmentExpression();
+            }
 
-        return {
+            return {
+                type: Syntax.VariableDeclarator,
+                id: id,
+                init: init
+            };
+        } else if (ahead.type === Token.Keyword && ahead.value === 'function') {
+          var expr = parseFunctionDeclaration();
+          return {
             type: Syntax.VariableDeclarator,
-            id: id,
-            init: init
-        };
+            id: expr.id,
+            init: expr
+          };
+        }
     }
 
     function parseVariableDeclarationList(kind) {
@@ -2099,7 +1937,7 @@ parseStatement: true, parseSourceElement: true */
     function parseVariableStatement() {
         var declarations;
 
-        expectKeyword('var');
+        expectKeyword('local');
 
         declarations = parseVariableDeclarationList();
 
@@ -2108,7 +1946,7 @@ parseStatement: true, parseSourceElement: true */
         return {
             type: Syntax.VariableDeclaration,
             declarations: declarations,
-            kind: 'var'
+            kind: 'local'
         };
     }
 
@@ -2265,7 +2103,7 @@ parseStatement: true, parseSourceElement: true */
         if (match(';')) {
             lex();
         } else {
-            if (matchKeyword('var') || matchKeyword('let')) {
+            if (matchKeyword('local') || matchKeyword('let')) {
                 state.allowIn = false;
                 init = parseForVariableDeclaration();
                 state.allowIn = true;
@@ -2707,10 +2545,6 @@ parseStatement: true, parseSourceElement: true */
             switch (token.value) {
             case 'break':
                 return parseBreakStatement();
-            case 'continue':
-                return parseContinueStatement();
-            case 'debugger':
-                return parseDebuggerStatement();
             case 'do':
                 return parseDoWhileStatement();
             case 'for':
@@ -2721,18 +2555,10 @@ parseStatement: true, parseSourceElement: true */
                 return parseIfStatement();
             case 'return':
                 return parseReturnStatement();
-            case 'switch':
-                return parseSwitchStatement();
-            case 'throw':
-                return parseThrowStatement();
-            case 'try':
-                return parseTryStatement();
-            case 'var':
+            case 'local':
                 return parseVariableStatement();
             case 'while':
                 return parseWhileStatement();
-            case 'with':
-                return parseWithStatement();
             default:
                 break;
             }
@@ -2773,7 +2599,7 @@ parseStatement: true, parseSourceElement: true */
         var sourceElement, sourceElements = [], token, directive, firstRestricted,
             oldLabelSet, oldInIteration, oldInSwitch, oldInFunctionBody;
 
-        expect('{');
+        // expect('{');
 
         while (index < length) {
             token = lookahead();
@@ -2811,7 +2637,7 @@ parseStatement: true, parseSourceElement: true */
         state.inFunctionBody = true;
 
         while (index < length) {
-            if (match('}')) {
+            if (matchKeyword('end')) {
                 break;
             }
             sourceElement = parseSourceElement();
@@ -2821,7 +2647,8 @@ parseStatement: true, parseSourceElement: true */
             sourceElements.push(sourceElement);
         }
 
-        expect('}');
+        // expect('}');
+        expectKeyword('end');
 
         state.labelSet = oldLabelSet;
         state.inIteration = oldInIteration;
@@ -2988,9 +2815,6 @@ parseStatement: true, parseSourceElement: true */
 
         if (token.type === Token.Keyword) {
             switch (token.value) {
-            case 'const':
-            case 'let':
-                return parseConstLetDeclaration(token.value);
             case 'function':
                 return parseFunctionDeclaration();
             default:
@@ -3122,9 +2946,9 @@ parseStatement: true, parseSourceElement: true */
                         throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
                     }
                     comment += ch;
-                    if (ch === '*') {
+                    if (ch === ']') {
                         ch = source[index];
-                        if (ch === '/') {
+                        if (ch === ']') {
                             comment = comment.substr(0, comment.length - 1);
                             blockComment = false;
                             ++index;
@@ -3133,18 +2957,21 @@ parseStatement: true, parseSourceElement: true */
                         }
                     }
                 }
-            } else if (ch === '/') {
+            } else if (ch === '-') {
                 ch = source[index + 1];
-                if (ch === '/') {
+                if (ch === '-') {
                     start = index;
                     index += 2;
                     lineComment = true;
-                } else if (ch === '*') {
-                    start = index;
-                    index += 2;
-                    blockComment = true;
-                    if (index >= length) {
-                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                    var ch1 = source[index + 2];
+                    var ch2 = source[index + 3];
+                    if (ch1 === '[' && ch2 == '[') {
+                        start = index;
+                        index += 2;
+                        blockComment = true;
+                        if (index >= length) {
+                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                        }
                     }
                 } else {
                     break;
@@ -3340,8 +3167,6 @@ parseStatement: true, parseSourceElement: true */
             extra.parseNewExpression = parseNewExpression;
             extra.parseNonComputedMember = parseNonComputedMember;
             extra.parseNonComputedProperty = parseNonComputedProperty;
-            extra.parseObjectProperty = parseObjectProperty;
-            extra.parseObjectPropertyKey = parseObjectPropertyKey;
             extra.parsePostfixExpression = parsePostfixExpression;
             extra.parsePrimaryExpression = parsePrimaryExpression;
             extra.parseProgram = parseProgram;
@@ -3377,8 +3202,6 @@ parseStatement: true, parseSourceElement: true */
             parseNewExpression = wrapTracking(extra.parseNewExpression);
             parseNonComputedMember = wrapTracking(extra.parseNonComputedMember);
             parseNonComputedProperty = wrapTracking(extra.parseNonComputedProperty);
-            parseObjectProperty = wrapTracking(extra.parseObjectProperty);
-            parseObjectPropertyKey = wrapTracking(extra.parseObjectPropertyKey);
             parsePostfixExpression = wrapTracking(extra.parsePostfixExpression);
             parsePrimaryExpression = wrapTracking(extra.parsePrimaryExpression);
             parseProgram = wrapTracking(extra.parseProgram);
@@ -3434,8 +3257,6 @@ parseStatement: true, parseSourceElement: true */
             parseNewExpression = extra.parseNewExpression;
             parseNonComputedMember = extra.parseNonComputedMember;
             parseNonComputedProperty = extra.parseNonComputedProperty;
-            parseObjectProperty = extra.parseObjectProperty;
-            parseObjectPropertyKey = extra.parseObjectPropertyKey;
             parsePrimaryExpression = extra.parsePrimaryExpression;
             parsePostfixExpression = extra.parsePostfixExpression;
             parseProgram = extra.parseProgram;
