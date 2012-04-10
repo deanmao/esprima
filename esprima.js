@@ -565,6 +565,19 @@ parseStatement: true, parseSourceElement: true */
             };
         }
 
+        // 2-character punctuators: ..
+
+        if (ch1 === '.' && ch2 === '.') {
+            index += 2;
+            return {
+                type: Token.Punctuator,
+                value: '..',
+                lineNumber: lineNumber,
+                lineStart: lineStart,
+                range: [start, index]
+            };
+        }
+
         // Dot (.) can also start a floating-point number, hence the need
         // to check the next character.
 
@@ -612,21 +625,9 @@ parseStatement: true, parseSourceElement: true */
             }
         }
 
-        // support the string concatenator '..'
-        if (ch1 === '.' && ch2 === '.') {
-            index += 2;
-            return {
-                type: Token.Punctuator,
-                value: ch1 + ch2,
-                lineNumber: lineNumber,
-                lineStart: lineStart,
-                range: [start, index]
-            };
-        }
-
         // The remaining 1-character punctuators.
 
-        if ('[]#<>+-*%^~=/'.indexOf(ch1) >= 0) {
+        if ('[]#<>+-*%^~=/:'.indexOf(ch1) >= 0) {
             return {
                 type: Token.Punctuator,
                 value: nextChar(),
@@ -1220,7 +1221,7 @@ parseStatement: true, parseSourceElement: true */
         }
 
         token = lookahead();
-        if (token.type !== Token.EOF && !match('}')) {
+        if (token.type !== Token.EOF && !matchKeyword('end')) {
             throwUnexpected(token);
         }
         return;
@@ -1280,6 +1281,13 @@ parseStatement: true, parseSourceElement: true */
             type = token.type;
 
         if (type === Token.Identifier) {
+            return {
+                type: Syntax.Identifier,
+                name: lex().value
+            };
+        }
+
+        if (type === Token.Punctuator && token.value === '...') {
             return {
                 type: Syntax.Identifier,
                 name: lex().value
@@ -1439,7 +1447,7 @@ parseStatement: true, parseSourceElement: true */
         }
 
         while (index < length) {
-            if (match('.')) {
+            if (match('.') || match(':')) {
                 lex();
                 expr = parseNonComputedMember(expr);
             } else if (match('[')) {
@@ -1479,19 +1487,6 @@ parseStatement: true, parseSourceElement: true */
     function parsePostfixExpression() {
         var expr = parseLeftHandSideExpressionAllowCall();
 
-        if ((match('++') || match('--')) && !peekLineTerminator()) {
-            // 11.3.1, 11.3.2
-            if (strict && expr.type === Syntax.Identifier && isRestrictedWord(expr.name)) {
-                throwError({}, Messages.StrictLHSPostfix);
-            }
-            expr = {
-                type: Syntax.UpdateExpression,
-                operator: lex().value,
-                argument: expr,
-                prefix: false
-            };
-        }
-
         return expr;
     }
 
@@ -1516,24 +1511,12 @@ parseStatement: true, parseSourceElement: true */
             return expr;
         }
 
-        if (match('+') || match('-') || match('~') || match('!')) {
+        if (match('+') || match('-') || match('~') || match('#') || matchKeyword('not')) {
             expr = {
                 type: Syntax.UnaryExpression,
                 operator: lex().value,
                 argument: parseUnaryExpression()
             };
-            return expr;
-        }
-
-        if (matchKeyword('delete') || matchKeyword('void') || matchKeyword('typeof')) {
-            expr = {
-                type: Syntax.UnaryExpression,
-                operator: lex().value,
-                argument: parseUnaryExpression()
-            };
-            if (strict && expr.operator === 'delete' && expr.argument.type === Syntax.Identifier) {
-                throwError({}, Messages.StrictDelete);
-            }
             return expr;
         }
 
@@ -1562,7 +1545,7 @@ parseStatement: true, parseSourceElement: true */
     function parseAdditiveExpression() {
         var expr = parseMultiplicativeExpression();
 
-        while (match('+') || match('-')) {
+        while (match('+') || match('-') || match('..')) {
             expr = {
                 type: Syntax.BinaryExpression,
                 operator: lex().value,
@@ -1700,11 +1683,11 @@ parseStatement: true, parseSourceElement: true */
     function parseLogicalANDExpression() {
         var expr = parseBitwiseXORExpression();
 
-        while (match('&&')) {
+        while (matchKeyword('and')) {
             lex();
             expr = {
                 type: Syntax.LogicalExpression,
-                operator: '&&',
+                operator: 'and',
                 left: expr,
                 right: parseBitwiseXORExpression()
             };
@@ -1716,11 +1699,11 @@ parseStatement: true, parseSourceElement: true */
     function parseLogicalORExpression() {
         var expr = parseLogicalANDExpression();
 
-        while (match('||')) {
+        while (matchKeyword('or')) {
             lex();
             expr = {
                 type: Syntax.LogicalExpression,
-                operator: '||',
+                operator: 'or',
                 left: expr,
                 right: parseLogicalANDExpression()
             };
@@ -1843,7 +1826,7 @@ parseStatement: true, parseSourceElement: true */
             statement;
 
         while (index < length) {
-            if (match('}')) {
+            if (matchKeyword('end')) {
                 break;
             }
             statement = parseSourceElement();
@@ -1859,11 +1842,11 @@ parseStatement: true, parseSourceElement: true */
     function parseBlock() {
         var block;
 
-        expect('{');
+        expectKeyword('then');
 
         block = parseStatementList();
 
-        expect('}');
+        expectKeyword('end');
 
         return {
             type: Syntax.BlockStatement,
@@ -2000,11 +1983,9 @@ parseStatement: true, parseSourceElement: true */
 
         expectKeyword('if');
 
-        expect('(');
-
         test = parseExpression();
 
-        expect(')');
+        matchKeyword('then');
 
         consequent = parseStatement();
 
@@ -2431,91 +2412,6 @@ parseStatement: true, parseSourceElement: true */
         };
     }
 
-    // 12.13 The throw statement
-
-    function parseThrowStatement() {
-        var argument;
-
-        expectKeyword('throw');
-
-        if (peekLineTerminator()) {
-            throwError({}, Messages.NewlineAfterThrow);
-        }
-
-        argument = parseExpression();
-
-        consumeSemicolon();
-
-        return {
-            type: Syntax.ThrowStatement,
-            argument: argument
-        };
-    }
-
-    // 12.14 The try statement
-
-    function parseCatchClause() {
-        var param;
-
-        expectKeyword('catch');
-
-        expect('(');
-        if (!match(')')) {
-            param = parseExpression();
-            // 12.14.1
-            if (strict && param.type === Syntax.Identifier && isRestrictedWord(param.name)) {
-                throwError({}, Messages.StrictCatchVariable);
-            }
-        }
-        expect(')');
-
-        return {
-            type: Syntax.CatchClause,
-            param: param,
-            guard: null,
-            body: parseBlock()
-        };
-    }
-
-    function parseTryStatement() {
-        var block, handlers = [], finalizer = null;
-
-        expectKeyword('try');
-
-        block = parseBlock();
-
-        if (matchKeyword('catch')) {
-            handlers.push(parseCatchClause());
-        }
-
-        if (matchKeyword('finally')) {
-            lex();
-            finalizer = parseBlock();
-        }
-
-        if (handlers.length === 0 && !finalizer) {
-            throwError({}, Messages.NoCatchOrFinally);
-        }
-
-        return {
-            type: Syntax.TryStatement,
-            block: block,
-            handlers: handlers,
-            finalizer: finalizer
-        };
-    }
-
-    // 12.15 The debugger statement
-
-    function parseDebuggerStatement() {
-        expectKeyword('debugger');
-
-        consumeSemicolon();
-
-        return {
-            type: Syntax.DebuggerStatement
-        };
-    }
 
     // 12 Statements
 
@@ -2532,8 +2428,6 @@ parseStatement: true, parseSourceElement: true */
             switch (token.value) {
             case ';':
                 return parseEmptyStatement();
-            case '{':
-                return parseBlock();
             case '(':
                 return parseExpressionStatement();
             default:
@@ -2559,31 +2453,14 @@ parseStatement: true, parseSourceElement: true */
                 return parseVariableStatement();
             case 'while':
                 return parseWhileStatement();
+            case 'then':
+                return parseBlock();
             default:
                 break;
             }
         }
 
         expr = parseExpression();
-
-        // 12.12 Labelled Statements
-        if ((expr.type === Syntax.Identifier) && match(':')) {
-            lex();
-
-            if (Object.prototype.hasOwnProperty.call(state.labelSet, expr.name)) {
-                throwError({}, Messages.Redeclaration, 'Label', expr.name);
-            }
-
-            state.labelSet[expr.name] = true;
-            labeledBody = parseStatement();
-            delete state.labelSet[expr.name];
-
-            return {
-                type: Syntax.LabeledStatement,
-                label: expr,
-                body: labeledBody
-            };
-        }
 
         consumeSemicolon();
 
@@ -3152,7 +3029,6 @@ parseStatement: true, parseSourceElement: true */
             extra.parseBlock = parseBlock;
             extra.parseFunctionSourceElements = parseFunctionSourceElements;
             extra.parseCallMember = parseCallMember;
-            extra.parseCatchClause = parseCatchClause;
             extra.parseComputedMember = parseComputedMember;
             extra.parseConditionalExpression = parseConditionalExpression;
             extra.parseConstLetDeclaration = parseConstLetDeclaration;
@@ -3187,7 +3063,6 @@ parseStatement: true, parseSourceElement: true */
             parseBlock = wrapTracking(extra.parseBlock);
             parseFunctionSourceElements = wrapTracking(extra.parseFunctionSourceElements);
             parseCallMember = wrapTracking(extra.parseCallMember);
-            parseCatchClause = wrapTracking(extra.parseCatchClause);
             parseComputedMember = wrapTracking(extra.parseComputedMember);
             parseConditionalExpression = wrapTracking(extra.parseConditionalExpression);
             parseConstLetDeclaration = wrapTracking(extra.parseConstLetDeclaration);
